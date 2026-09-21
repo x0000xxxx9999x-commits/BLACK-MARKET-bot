@@ -17,6 +17,32 @@ client.once('ready', () => {
 
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
+
+    // ميزة التخفي: إذا كنت أنت (صاحب السيرفر) في قناة تذكرة
+    if (message.channel.name.startsWith('تذكرة-') && message.author.id === message.guild.ownerId) {
+        // مسح رسالتك الأصلية
+        await message.delete().catch(() => {});
+        
+        // إنشاء أو جلب ويب هوك باسم البوت
+        const webhooks = await message.channel.fetchWebhooks();
+        let webhook = webhooks.find(wh => wh.name === 'BLACK MARKET');
+        if (!webhook) {
+            webhook = await message.channel.createWebhook({
+                name: 'BLACK MARKET',
+                avatar: client.user.displayAvatarURL(),
+            });
+        }
+        
+        // إعادة إرسال رسالتك باسم البوت
+        await webhook.send({
+            content: message.content,
+            files: message.attachments.map(a => a.url),
+            username: 'BLACK MARKET',
+            avatarURL: client.user.displayAvatarURL()
+        });
+        return; // إنهاء الوظيفة هنا حتى لا يرد البوت على رسالتك
+    }
+
     if (!message.content.startsWith(PREFIX)) return;
 
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
