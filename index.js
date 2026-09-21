@@ -128,7 +128,7 @@ client.on('messageCreate', async (message) => {
                     .setStyle(ButtonStyle.Success)
             );
 
-        // إرسال العرض في نفس القناة التي كتبت فيها الأمر
+        // إرسال العرض في نفس القناة التي كتبت فيها الأمر، أي قناة كانت
         await message.channel.send({ embeds: [embed], components: [button] });
         
         // حذف رسالة الأمر الأصلية
