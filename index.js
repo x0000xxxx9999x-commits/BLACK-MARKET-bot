@@ -89,17 +89,10 @@ client.on('messageCreate', async (message) => {
         message.channel.send('✅ تم إنشاء جميع الأقسام بنجاح! (لن يراها إلا أنت)');
     }
 
-    // أمر إضافة عرض: !offer [الاسم] [السعر] [الوصف] (يُكتب داخل القناة المستهدفة)
+    // أمر إضافة عرض: !offer [الاسم] [السعر] [الوصف] (يعمل في أي قناة)
     if (command === 'offer') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply('❌ هذا الأمر للمشرفين فقط.');
-        }
-
-        const validChannels = ['🚗-شراء-سيارات', '🔫-شراء-أسلحة-خارج-القانون', '🏠-شراء-بيوت', '❓-طلب-شيء-معين', '💰-أبيع-الأشياء', '⏳-خصم-الشراء-المؤقت'];
-        const isTargetChannel = validChannels.some(ch => message.channel.name.includes(ch));
-
-        if (!isTargetChannel) {
-            return message.reply('❌ يجب كتابة أمر العرض داخل القناة المخصصة له.\n(مثال: اذهب إلى قناة 🚗-شراء-سيارات واكتب `!offer بورش 50000 سيارة نظيفة`)');
         }
 
         const itemName = args[0];
