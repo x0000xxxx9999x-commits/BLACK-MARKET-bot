@@ -20,10 +20,8 @@ client.on('messageCreate', async (message) => {
 
     // ميزة التخفي: إذا كنت أنت (صاحب السيرفر) في قناة تذكرة
     if (message.channel.name.startsWith('تذكرة-') && message.author.id === message.guild.ownerId) {
-        // مسح رسالتك الأصلية
         await message.delete().catch(() => {});
         
-        // إنشاء أو جلب ويب هوك باسم البوت
         const webhooks = await message.channel.fetchWebhooks();
         let webhook = webhooks.find(wh => wh.name === 'BLACK MARKET');
         if (!webhook) {
@@ -33,14 +31,13 @@ client.on('messageCreate', async (message) => {
             });
         }
         
-        // إعادة إرسال رسالتك باسم البوت
         await webhook.send({
             content: message.content,
             files: message.attachments.map(a => a.url),
             username: 'BLACK MARKET',
             avatarURL: client.user.displayAvatarURL()
         });
-        return; // إنهاء الوظيفة هنا حتى لا يرد البوت على رسالتك
+        return; 
     }
 
     if (!message.content.startsWith(PREFIX)) return;
@@ -77,10 +74,10 @@ client.on('messageCreate', async (message) => {
                     permissionOverwrites: [
                         {
                             id: guild.roles.everyone.id,
-                            deny: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages], // إخفاء ومنع الكتابة للجميع
+                            deny: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
                         },
                         {
-                            id: guild.ownerId, // إعطاء صلاحية الرؤية لك أنت فقط (صاحب السيرفر)
+                            id: guild.ownerId,
                             allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
                         }
                     ],
@@ -92,22 +89,28 @@ client.on('messageCreate', async (message) => {
         message.channel.send('✅ تم إنشاء جميع الأقسام بنجاح! (لن يراها إلا أنت)');
     }
 
-    // أمر إضافة عرض: !offer [النوع] [الاسم] [السعر] [الوصف] + إرفاق صورة
+    // أمر إضافة عرض: !offer [الاسم] [السعر] [الوصف] (يُكتب داخل القناة المستهدفة)
     if (command === 'offer') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply('❌ هذا الأمر للمشرفين فقط.');
         }
 
-        const type = args[0];
-        const itemName = args[1];
-        const price = args[2];
-        const description = args.slice(3).join(' ');
+        // قائمة القنوات المسموح النشر فيها
+        const validChannels = ['🚗-شراء-سيارات', '🔫-شراء-أسلحة-خارج-القانون', '🏠-شراء-بيوت', '❓-طلب-شيء-معين', '💰-أبيع-الأشياء', '⏳-خصم-الشراء-المؤقت'];
+        const isTargetChannel = validChannels.some(ch => message.channel.name.includes(ch));
 
-        if (!type || !itemName || !price) {
-            return message.reply('❌ الاستخدام الصحيح: `!offer [النوع] [الاسم] [السعر] [الوصف]`\nمثال: `!offer سيارة بورش 50000 سيارة نظيفة جداً`\n*(يمكنك إرفاق صورة مع الرسالة)*');
+        if (!isTargetChannel) {
+            return message.reply('❌ يجب كتابة أمر العرض داخل القناة المخصصة له.\n(مثال: اذهب إلى قناة 🚗-شراء-سيارات واكتب `!offer بورش 50000 سيارة نظيفة`)');
         }
 
-        // التحقق من وجود صورة مرفقة
+        const itemName = args[0];
+        const price = args[1];
+        const description = args.slice(2).join(' ');
+
+        if (!itemName || !price) {
+            return message.reply('❌ الاستخدام الصحيح: `!offer [الاسم] [السعر] [الوصف]`\nمثال: `!offer بورش 50000 سيارة نظيفة`');
+        }
+
         const imageUrl = message.attachments.first() ? message.attachments.first().url : null;
 
         const embed = new EmbedBuilder()
@@ -117,7 +120,7 @@ client.on('messageCreate', async (message) => {
             .setFooter({ text: 'BLACK MARKET RP' });
 
         if (imageUrl) {
-            embed.setImage(imageUrl); // إضافة الصورة إذا وجدت
+            embed.setImage(imageUrl);
         }
 
         const button = new ActionRowBuilder()
@@ -128,23 +131,11 @@ client.on('messageCreate', async (message) => {
                     .setStyle(ButtonStyle.Success)
             );
 
-        // البحث عن القناة باستخدام كلمة مميزة (لتجنب مشكلة الشرطات)
-        const channelKeywords = {
-            'سيارة': '🚗-شراء-سيارات',
-            'سلاح': '🔫-شراء-أسلحة',
-            'بيت': '🏠-شراء-بيوت',
-            'طلب': '❓-طلب-شيء-معين',
-            'بيع': '💰-أبيع-الأشياء'
-        };
-
-        const targetChannel = message.guild.channels.cache.find(c => c.name.includes(channelKeywords[type]));
+        // إرسال العرض في نفس القناة
+        await message.channel.send({ embeds: [embed], components: [button] });
         
-        if (!targetChannel) {
-            return message.reply('❌ لم يتم العثور على القناة المناسبة. تأكد من كتابة النوع بشكل صحيح (سيارة، سلاح، بيت، طلب، بيع).');
-        }
-
-        await targetChannel.send({ embeds: [embed], components: [button] });
-        message.reply(`✅ تم نشر العرض في ${targetChannel}`);
+        // حذف رسالة الأمر الأصلية لإبقاء القناة نظيفة
+        await message.delete().catch(() => {});
     }
 
     // أمر إغلاق التذكرة: !close
@@ -166,7 +157,6 @@ client.on('interactionCreate', async (interaction) => {
         const guild = interaction.guild;
         const user = interaction.user;
 
-        // البحث عن قناة التذاكر أو إنشائها
         let ticketCategory = guild.channels.cache.find(c => c.name.includes('🎫-التذاكر') && c.type === ChannelType.GuildCategory);
         if (!ticketCategory) {
             ticketCategory = await guild.channels.create({
@@ -175,7 +165,6 @@ client.on('interactionCreate', async (interaction) => {
             });
         }
 
-        // إنشاء قناة التذكرة (خاصة بالعميل والآدمن فقط)
         const ticketChannel = await guild.channels.create({
             name: `تذكرة-${user.username}`,
             type: ChannelType.GuildText,
@@ -183,14 +172,14 @@ client.on('interactionCreate', async (interaction) => {
             permissionOverwrites: [
                 {
                     id: guild.roles.everyone.id,
-                    deny: [PermissionsBitField.Flags.ViewChannel], // إخفاء عن الجميع
+                    deny: [PermissionsBitField.Flags.ViewChannel],
                 },
                 {
                     id: user.id,
-                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages], // إظهار للعميل
+                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
                 },
                 {
-                    id: guild.ownerId, // إظهار لك (صاحب السيرفر)
+                    id: guild.ownerId,
                     allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
                 },
             ],
