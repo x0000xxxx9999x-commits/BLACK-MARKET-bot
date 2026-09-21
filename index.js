@@ -31,10 +31,9 @@ client.on('messageCreate', async (message) => {
             });
         }
         
-        // إصلاح مشكلة الصور: إرسال الملف نفسه وليس الرابط
         await webhook.send({
             content: message.content,
-            files: Array.from(message.attachments.values()), // إرسال الملفات مباشرة
+            files: Array.from(message.attachments.values()),
             username: 'BLACK MARKET',
             avatarURL: client.user.displayAvatarURL()
         });
@@ -111,7 +110,6 @@ client.on('messageCreate', async (message) => {
             return message.reply('❌ الاستخدام الصحيح: `!offer [الاسم] [السعر] [الوصف]`\nمثال: `!offer بورش 50000 سيارة نظيفة`');
         }
 
-        // إصلاح مشكلة الصور: التحقق من أن المرفق هو صورة
         const attachment = message.attachments.first();
         let imageUrl = null;
         if (attachment && attachment.contentType && attachment.contentType.startsWith('image/')) {
@@ -140,9 +138,33 @@ client.on('messageCreate', async (message) => {
         await message.delete().catch(() => {});
     }
 
+    // أمر إنشاء لوحة البيع: !sell_panel (يُكتب داخل قناة "أبيع الأشياء")
+    if (command === 'sell_panel') {
+        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return message.reply('❌ هذا الأمر للمشرفين فقط.');
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle('💰 BLACK MARKET | بيع الأشياء')
+            .setDescription('هل لديك شيء تريد بيعه لصاحب السوق؟\nاضغط على الزر أدناه لفتح تذكرة خاصة والتفاوض مع صاحب السوق بشكل سري.')
+            .setColor(0x000000)
+            .setFooter({ text: 'BLACK MARKET RP' });
+
+        const button = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('sell_item')
+                    .setLabel('💰 تقديم طلب بيع')
+                    .setStyle(ButtonStyle.Primary)
+            );
+
+        await message.channel.send({ embeds: [embed], components: [button] });
+        await message.delete().catch(() => {});
+    }
+
     // أمر إغلاق التذكرة: !close
     if (command === 'close') {
-        if (message.channel.name.startsWith('تذكرة-')) {
+        if (message.channel.name.startsWith('تذكرة-') || message.channel.name.startsWith('بيع-')) {
             await message.channel.delete();
         } else {
             message.reply('❌ هذا الأمر يعمل فقط داخل قنوات التذاكر.');
@@ -154,6 +176,7 @@ client.on('messageCreate', async (message) => {
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
 
+    // زر الشراء (يأتي من العروض)
     if (interaction.customId.startsWith('buy_')) {
         const itemName = interaction.customId.replace('buy_', '');
         const guild = interaction.guild;
@@ -172,18 +195,9 @@ client.on('interactionCreate', async (interaction) => {
             type: ChannelType.GuildText,
             parent: ticketCategory.id,
             permissionOverwrites: [
-                {
-                    id: guild.roles.everyone.id,
-                    deny: [PermissionsBitField.Flags.ViewChannel],
-                },
-                {
-                    id: user.id,
-                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
-                },
-                {
-                    id: guild.ownerId,
-                    allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages],
-                },
+                { id: guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+                { id: guild.ownerId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
             ],
         });
 
@@ -192,6 +206,40 @@ client.on('interactionCreate', async (interaction) => {
         const embed = new EmbedBuilder()
             .setTitle('🎫 تذكرة شراء جديدة')
             .setDescription(`مرحباً ${user}، لقد قمت بطلب شراء: **${itemName}**\nالرجاء الانتظار حتى يأتي صاحب السوق للتعامل معك.`)
+            .setColor(0x000000);
+
+        await ticketChannel.send({ content: `${user} | <@${guild.ownerId}>`, embeds: [embed] });
+    }
+
+    // زر البيع (يأتي من لوحة البيع)
+    if (interaction.customId === 'sell_item') {
+        const guild = interaction.guild;
+        const user = interaction.user;
+
+        let ticketCategory = guild.channels.cache.find(c => c.name.includes('🎫-التذاكر') && c.type === ChannelType.GuildCategory);
+        if (!ticketCategory) {
+            ticketCategory = await guild.channels.create({
+                name: '🎫-التذاكر',
+                type: ChannelType.GuildCategory,
+            });
+        }
+
+        const ticketChannel = await guild.channels.create({
+            name: `بيع-${user.username}`,
+            type: ChannelType.GuildText,
+            parent: ticketCategory.id,
+            permissionOverwrites: [
+                { id: guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                { id: user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+                { id: guild.ownerId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+            ],
+        });
+
+        await interaction.reply({ content: `✅ تم إنشاء تذكرة البيع الخاصة بك: ${ticketChannel}`, ephemeral: true });
+
+        const embed = new EmbedBuilder()
+            .setTitle('💰 تذكرة بيع جديدة')
+            .setDescription(`مرحباً ${user}، لقد قمت بتقديم طلب لبيع شيء ما.\nالرجاء كتابة تفاصيل ما تريد بيعه وسعره المطلوب، وسيتواصل معك صاحب السوق قريباً.`)
             .setColor(0x000000);
 
         await ticketChannel.send({ content: `${user} | <@${guild.ownerId}>`, embeds: [embed] });
