@@ -89,20 +89,21 @@ client.on('messageCreate', async (message) => {
         message.channel.send('✅ تم إنشاء جميع الأقسام بنجاح! (لن يراها إلا أنت)');
     }
 
-    // أمر إضافة عرض: !offer [الاسم] [السعر] [الوصف] (يعمل في أي قناة)
+    // أمر إضافة عرض: !offer [العنوان] [السعر] [الوصف] (يعمل في أي قناة بدون شروط)
     if (command === 'offer') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply('❌ هذا الأمر للمشرفين فقط.');
         }
 
-        const itemName = args[0];
-        const price = args[1];
-        const description = args.slice(2).join(' ');
+        const itemName = args[0]; // العنوان
+        const price = args[1];    // السعر
+        const description = args.slice(2).join(' '); // الوصف
 
         if (!itemName || !price) {
-            return message.reply('❌ الاستخدام الصحيح: `!offer [الاسم] [السعر] [الوصف]`\nمثال: `!offer بورش 50000 سيارة نظيفة`');
+            return message.reply('❌ الاستخدام الصحيح: `!offer [العنوان] [السعر] [الوصف]`\nمثال: `!offer بورش 50000 سيارة نظيفة`');
         }
 
+        // التحقق من وجود صورة مرفقة
         const attachment = message.attachments.first();
         let imageUrl = null;
         if (attachment && attachment.contentType && attachment.contentType.startsWith('image/')) {
@@ -116,7 +117,7 @@ client.on('messageCreate', async (message) => {
             .setFooter({ text: 'BLACK MARKET RP' });
 
         if (imageUrl) {
-            embed.setImage(imageUrl);
+            embed.setImage(imageUrl); // إضافة الصورة إذا وجدت
         }
 
         const button = new ActionRowBuilder()
@@ -127,11 +128,14 @@ client.on('messageCreate', async (message) => {
                     .setStyle(ButtonStyle.Success)
             );
 
+        // إرسال العرض في نفس القناة التي كتبت فيها الأمر
         await message.channel.send({ embeds: [embed], components: [button] });
+        
+        // حذف رسالة الأمر الأصلية
         await message.delete().catch(() => {});
     }
 
-    // أمر إنشاء لوحة البيع: !sell_panel (يُكتب داخل قناة "أبيع الأشياء")
+    // أمر إنشاء لوحة البيع: !sell_panel
     if (command === 'sell_panel') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply('❌ هذا الأمر للمشرفين فقط.');
