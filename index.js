@@ -31,9 +31,10 @@ client.on('messageCreate', async (message) => {
             });
         }
         
+        // إصلاح مشكلة الصور: إرسال الملف نفسه وليس الرابط
         await webhook.send({
             content: message.content,
-            files: message.attachments.map(a => a.url),
+            files: Array.from(message.attachments.values()), // إرسال الملفات مباشرة
             username: 'BLACK MARKET',
             avatarURL: client.user.displayAvatarURL()
         });
@@ -95,7 +96,6 @@ client.on('messageCreate', async (message) => {
             return message.reply('❌ هذا الأمر للمشرفين فقط.');
         }
 
-        // قائمة القنوات المسموح النشر فيها
         const validChannels = ['🚗-شراء-سيارات', '🔫-شراء-أسلحة-خارج-القانون', '🏠-شراء-بيوت', '❓-طلب-شيء-معين', '💰-أبيع-الأشياء', '⏳-خصم-الشراء-المؤقت'];
         const isTargetChannel = validChannels.some(ch => message.channel.name.includes(ch));
 
@@ -111,7 +111,12 @@ client.on('messageCreate', async (message) => {
             return message.reply('❌ الاستخدام الصحيح: `!offer [الاسم] [السعر] [الوصف]`\nمثال: `!offer بورش 50000 سيارة نظيفة`');
         }
 
-        const imageUrl = message.attachments.first() ? message.attachments.first().url : null;
+        // إصلاح مشكلة الصور: التحقق من أن المرفق هو صورة
+        const attachment = message.attachments.first();
+        let imageUrl = null;
+        if (attachment && attachment.contentType && attachment.contentType.startsWith('image/')) {
+            imageUrl = attachment.url;
+        }
 
         const embed = new EmbedBuilder()
             .setTitle(`🕶️ BLACK MARKET | ${itemName}`)
@@ -131,10 +136,7 @@ client.on('messageCreate', async (message) => {
                     .setStyle(ButtonStyle.Success)
             );
 
-        // إرسال العرض في نفس القناة
         await message.channel.send({ embeds: [embed], components: [button] });
-        
-        // حذف رسالة الأمر الأصلية لإبقاء القناة نظيفة
         await message.delete().catch(() => {});
     }
 
