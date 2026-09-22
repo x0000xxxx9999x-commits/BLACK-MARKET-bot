@@ -11,15 +11,38 @@ const client = new Client({
 
 const PREFIX = '!';
 
+// دالة إنشاء لوحة البيع (تُستخدم عند كتابة الأمر)
+function createSellPanel() {
+    const embed = new EmbedBuilder()
+        .setTitle('💰 BLACK MARKET | بيع الأشياء')
+        .setDescription('هل لديك شيء تريد بيعه لصاحب السوق؟\n**اختر نوع الشيء الذي تريد بيعه من الأزرار أدناه** وسيتم فتح تذكرة خاصة بك للتفاوض مع صاحب السوق بشكل سري.')
+        .setColor(0x000000)
+        .setFooter({ text: 'BLACK MARKET RP' });
+
+    const row1 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('sell_car').setLabel('🚗 سيارة').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('sell_weapon').setLabel('🔫 سلاح').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('sell_house').setLabel('🏠 بيت').setStyle(ButtonStyle.Primary)
+    );
+
+    const row2 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('sell_rare').setLabel('💎 شيء نادر').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('sell_other').setLabel('📦 أخرى').setStyle(ButtonStyle.Primary)
+    );
+
+    return { embeds: [embed], components: [row1, row2] };
+}
+
 client.once('ready', () => {
     console.log(`✅ تم تسجيل الدخول بنجاح كـ ${client.user.tag}`);
+    // لا يوجد نشر تلقائي هنا. اللوحة تُنشر فقط عند كتابة الأمر !see
 });
 
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
     // ميزة التخفي: إذا كنت أنت (صاحب السيرفر) في قناة تذكرة
-    if (message.channel.name.startsWith('تذكرة-') && message.author.id === message.guild.ownerId) {
+    if ((message.channel.name.startsWith('تذكرة-') || message.channel.name.startsWith('بيع-')) && message.author.id === message.guild.ownerId) {
         await message.delete().catch(() => {});
         
         const webhooks = await message.channel.fetchWebhooks();
@@ -89,21 +112,20 @@ client.on('messageCreate', async (message) => {
         message.channel.send('✅ تم إنشاء جميع الأقسام بنجاح! (لن يراها إلا أنت)');
     }
 
-    // أمر إضافة عرض: !offer [العنوان] [السعر] [الوصف] (يعمل في أي قناة بدون شروط)
+    // أمر إضافة عرض: !offer [العنوان] [السعر] [الوصف]
     if (command === 'offer') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply('❌ هذا الأمر للمشرفين فقط.');
         }
 
-        const itemName = args[0]; // العنوان
-        const price = args[1];    // السعر
-        const description = args.slice(2).join(' '); // الوصف
+        const itemName = args[0];
+        const price = args[1];
+        const description = args.slice(2).join(' ');
 
         if (!itemName || !price) {
             return message.reply('❌ الاستخدام الصحيح: `!offer [العنوان] [السعر] [الوصف]`\nمثال: `!offer بورش 50000 سيارة نظيفة`');
         }
 
-        // التحقق من وجود صورة مرفقة
         const attachment = message.attachments.first();
         let imageUrl = null;
         if (attachment && attachment.contentType && attachment.contentType.startsWith('image/')) {
@@ -117,7 +139,7 @@ client.on('messageCreate', async (message) => {
             .setFooter({ text: 'BLACK MARKET RP' });
 
         if (imageUrl) {
-            embed.setImage(imageUrl); // إضافة الصورة إذا وجدت
+            embed.setImage(imageUrl);
         }
 
         const button = new ActionRowBuilder()
@@ -128,34 +150,16 @@ client.on('messageCreate', async (message) => {
                     .setStyle(ButtonStyle.Success)
             );
 
-        // إرسال العرض في نفس القناة التي كتبت فيها الأمر، أي قناة كانت، وبدون أي شروط
         await message.channel.send({ embeds: [embed], components: [button] });
-        
-        // حذف رسالة الأمر الأصلية
         await message.delete().catch(() => {});
     }
 
-    // أمر إنشاء لوحة البيع: !sell_panel
-    if (command === 'sell_panel') {
+    // أمر إظهار لوحة البيع: !see (يُنشر في القناة التي تكتب فيها الأمر)
+    if (command === 'see') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply('❌ هذا الأمر للمشرفين فقط.');
         }
-
-        const embed = new EmbedBuilder()
-            .setTitle('💰 BLACK MARKET | بيع الأشياء')
-            .setDescription('هل لديك شيء تريد بيعه لصاحب السوق؟\nاضغط على الزر أدناه لفتح تذكرة خاصة والتفاوض مع صاحب السوق بشكل سري.')
-            .setColor(0x000000)
-            .setFooter({ text: 'BLACK MARKET RP' });
-
-        const button = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('sell_item')
-                    .setLabel('💰 تقديم طلب بيع')
-                    .setStyle(ButtonStyle.Primary)
-            );
-
-        await message.channel.send({ embeds: [embed], components: [button] });
+        await message.channel.send(createSellPanel());
         await message.delete().catch(() => {});
     }
 
@@ -208,10 +212,20 @@ client.on('interactionCreate', async (interaction) => {
         await ticketChannel.send({ content: `${user} | <@${guild.ownerId}>`, embeds: [embed] });
     }
 
-    // زر البيع (يأتي من لوحة البيع)
-    if (interaction.customId === 'sell_item') {
+    // أزرار البيع
+    if (interaction.customId.startsWith('sell_')) {
         const guild = interaction.guild;
         const user = interaction.user;
+
+        const itemTypes = {
+            'sell_car': '🚗 سيارة',
+            'sell_weapon': '🔫 سلاح',
+            'sell_house': '🏠 بيت',
+            'sell_rare': '💎 شيء نادر',
+            'sell_other': '📦 أخرى'
+        };
+
+        const itemType = itemTypes[interaction.customId] || '📦 أخرى';
 
         let ticketCategory = guild.channels.cache.find(c => c.name.includes('🎫-التذاكر') && c.type === ChannelType.GuildCategory);
         if (!ticketCategory) {
@@ -235,9 +249,10 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.reply({ content: `✅ تم إنشاء تذكرة البيع الخاصة بك: ${ticketChannel}`, ephemeral: true });
 
         const embed = new EmbedBuilder()
-            .setTitle('💰 تذكرة بيع جديدة')
-            .setDescription(`مرحباً ${user}، لقد قمت بتقديم طلب لبيع شيء ما.\nالرجاء كتابة تفاصيل ما تريد بيعه وسعره المطلوب، وسيتواصل معك صاحب السوق قريباً.`)
-            .setColor(0x000000);
+            .setTitle(`💰 تذكرة بيع جديدة | ${itemType}`)
+            .setDescription(`مرحباً ${user}، لقد اخترت بيع: **${itemType}**\n\n📌 **الرجاء إرسال المعلومات التالية:**\n• اسم الشيء الذي تريد بيعه\n• الوصف\n• الصورة (إن وجدت)\n• السعر المتوقع\n\nوسيتواصل معك صاحب السوق قريباً للتفاوض.`)
+            .setColor(0x000000)
+            .setFooter({ text: 'BLACK MARKET RP' });
 
         await ticketChannel.send({ content: `${user} | <@${guild.ownerId}>`, embeds: [embed] });
     }
